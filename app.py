@@ -1,9 +1,11 @@
 from flask import Flask, render_template, request, jsonify
 from google import genai
 import os
+import re
 
 app = Flask(__name__)
 
+# Gemini API Key
 api_key = os.environ.get("GEMINI_API_KEY")
 
 if not api_key:
@@ -21,6 +23,12 @@ def home():
 def ask():
 
     data = request.get_json()
+
+    if not data:
+        return jsonify({
+            "answer": "Please enter a question."
+        })
+
     question = data.get("question", "").strip()
 
     if not question:
@@ -45,6 +53,16 @@ LANGUAGE RULES:
 - Hindi question → answer only in Hindi.
 - Do not answer in Gujarati unless the user asks in Gujarati.
 - Use simple and clear language.
+
+IMPORTANT FORMATTING RULES:
+- Give answers in plain text only.
+- Do not use Markdown.
+- Do not use ** or * symbols.
+- Do not use # headings.
+- Do not use backticks.
+- Do not use Markdown bullet symbols.
+- Use simple numbered points when needed.
+- Do not add unnecessary formatting.
 - Give a direct and helpful answer.
 
 User Question:
@@ -52,16 +70,37 @@ User Question:
 """
 
     try:
+
         interaction = client.interactions.create(
             model="gemini-3.6-flash",
             input=prompt
         )
 
+        answer = interaction.output_text
+
+        # Remove Markdown formatting
+        answer = answer.replace("**", "")
+        answer = answer.replace("__", "")
+        answer = answer.replace("`", "")
+        answer = answer.replace("#", "")
+
+        # Remove single star formatting
+        answer = answer.replace("*", "")
+
+        # Remove Markdown bullet at line beginning
+        answer = re.sub(r"(?m)^\s*[-•]\s*", "", answer)
+
+        # Remove extra spaces
+        answer = re.sub(r"\n\s*\n\s*\n+", "\n\n", answer)
+
+        answer = answer.strip()
+
         return jsonify({
-            "answer": interaction.output_text
+            "answer": answer
         })
 
     except Exception as e:
+
         return jsonify({
             "answer": f"Error: {str(e)}"
         }), 500

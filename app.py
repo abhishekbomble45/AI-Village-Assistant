@@ -5,10 +5,7 @@ import re
 
 app = Flask(__name__)
 
-# ==============================
-# Gemini API Configuration
-# ==============================
-
+# Gemini API Key
 api_key = os.environ.get("GEMINI_API_KEY")
 
 if not api_key:
@@ -17,60 +14,63 @@ if not api_key:
 client = genai.Client(api_key=api_key)
 
 
-# ==============================
-# Home Page
-# ==============================
-
 @app.route("/")
 def home():
     return render_template("index.html")
 
 
-# ==============================
-# AI Question Answer
-# ==============================
-
 @app.route("/ask", methods=["POST"])
 def ask():
 
-    try:
-        data = request.get_json()
+    data = request.get_json()
 
-        if not data:
-            return jsonify({
-                "answer": "Please enter a question."
-            })
+    if not data:
+        return jsonify({
+            "answer": "Please enter a question."
+        })
 
-        question = data.get("question", "").strip()
+    question = data.get("question", "").strip()
 
-        if not question:
-            return jsonify({
-                "answer": "Please enter a question."
-            })
+    if not question:
+        return jsonify({
+            "answer": "Please enter a question."
+        })
 
-        # Short and fast prompt
-        prompt = f"""
-You are AI Village Assistant.
+    prompt = f"""
+You are an AI Village Assistant.
 
-Help users with:
-Agriculture, education, government schemes,
-digital services, village development and general information.
+You help village users with:
+- Agriculture
+- Education
+- Government schemes
+- Digital services
+- Village development
+- General information
 
-Language:
-English question = English answer.
-Marathi question = Marathi answer.
-Hindi question = Hindi answer.
+LANGUAGE RULES:
+- English question → answer only in English.
+- Marathi question → answer only in Marathi.
+- Hindi question → answer only in Hindi.
+- Do not answer in Gujarati unless the user asks in Gujarati.
+- Use simple and clear language.
 
-Use simple language.
-Give a direct answer.
-Do not use Markdown.
-Do not use *, **, # or bullet symbols.
+IMPORTANT FORMATTING RULES:
+- Give answers in plain text only.
+- Do not use Markdown.
+- Do not use ** or * symbols.
+- Do not use # headings.
+- Do not use backticks.
+- Do not use Markdown bullet symbols.
+- Use simple numbered points when needed.
+- Do not add unnecessary formatting.
+- Give a direct and helpful answer.
 
-Question:
+User Question:
 {question}
 """
 
-        # Gemini request
+    try:
+
         interaction = client.interactions.create(
             model="gemini-3.6-flash",
             input=prompt
@@ -78,24 +78,20 @@ Question:
 
         answer = interaction.output_text
 
-        # Clean formatting
+        # Remove Markdown formatting
         answer = answer.replace("**", "")
         answer = answer.replace("__", "")
         answer = answer.replace("`", "")
         answer = answer.replace("#", "")
+
+        # Remove single star formatting
         answer = answer.replace("*", "")
 
-        answer = re.sub(
-            r"(?m)^\s*[-•]\s*",
-            "",
-            answer
-        )
+        # Remove Markdown bullet at line beginning
+        answer = re.sub(r"(?m)^\s*[-•]\s*", "", answer)
 
-        answer = re.sub(
-            r"\n\s*\n\s*\n+",
-            "\n\n",
-            answer
-        )
+        # Remove extra spaces
+        answer = re.sub(r"\n\s*\n\s*\n+", "\n\n", answer)
 
         answer = answer.strip()
 
@@ -105,19 +101,10 @@ Question:
 
     except Exception as e:
 
-        print("ERROR:", str(e))
-
         return jsonify({
-            "answer": "Sorry, AI response failed. Please try again."
+            "answer": f"Error: {str(e)}"
         }), 500
 
 
-# ==============================
-# Run Flask
-# ==============================
-
 if __name__ == "__main__":
-    app.run(
-        host="0.0.0.0",
-        port=int(os.environ.get("PORT", 5000))
-    )
+    app.run()

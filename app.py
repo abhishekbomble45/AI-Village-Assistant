@@ -52,13 +52,13 @@ User Question:
 """
 
     try:
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt
+        interaction = client.interactions.create(
+            model="gemini-3.6-flash",
+            input=prompt
         )
 
         return jsonify({
-            "answer": response.text
+            "answer": interaction.output_text
         })
 
     except Exception as e:

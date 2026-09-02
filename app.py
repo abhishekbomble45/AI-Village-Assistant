@@ -1,12 +1,15 @@
 from flask import Flask, render_template, request, jsonify
-import requests
-import webbrowser
-from threading import Timer
+from google import genai
+import os
 
 app = Flask(__name__)
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL = "llama3.2"
+api_key = os.environ.get("GEMINI_API_KEY")
+
+if not api_key:
+    raise ValueError("GEMINI_API_KEY is not set")
+
+client = genai.Client(api_key=api_key)
 
 
 @app.route("/")
@@ -28,61 +31,41 @@ def ask():
     prompt = f"""
 You are an AI Village Assistant.
 
-IMPORTANT LANGUAGE RULE:
-- If the user's question is written in English, answer ONLY in English.
-- If the user's question is written in Marathi, answer ONLY in Marathi.
-- If the user's question is written in Hindi, answer ONLY in Hindi.
-- Do NOT translate an English question into Gujarati.
-- Never answer in Gujarati unless the user asks in Gujarati.
+You help village users with:
+- Agriculture
+- Education
+- Government schemes
+- Digital services
+- Village development
+- General information
+
+LANGUAGE RULES:
+- English question → answer only in English.
+- Marathi question → answer only in Marathi.
+- Hindi question → answer only in Hindi.
+- Do not answer in Gujarati unless the user asks in Gujarati.
 - Use simple and clear language.
+- Give a direct and helpful answer.
 
-User's question:
+User Question:
 {question}
-
-Give a direct and helpful answer.
 """
 
     try:
-
-        response = requests.post(
-    OLLAMA_URL,
-    json={
-        "model": MODEL,
-        "prompt": prompt,
-        "stream": False,
-        "keep_alive": "10m"
-    },
-    timeout=600
-)
-
-
-        response.raise_for_status()
-
-        result = response.json()
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt
+        )
 
         return jsonify({
-            "answer": result.get("response", "No answer received.")
+            "answer": response.text
         })
 
-    except requests.exceptions.ConnectionError:
-
-        return jsonify({
-            "answer": "Ollama is not running. Please start Ollama first."
-        }), 500
-
     except Exception as e:
-
         return jsonify({
             "answer": f"Error: {str(e)}"
         }), 500
 
 
-def open_browser():
-    webbrowser.open("http://127.0.0.1:5000")
-
-
 if __name__ == "__main__":
-
-    Timer(1, open_browser).start()
-
-    app.run(debug=True)
+    app.run()
